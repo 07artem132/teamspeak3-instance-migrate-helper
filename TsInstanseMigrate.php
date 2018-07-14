@@ -209,60 +209,62 @@ if ( ! $restoreOnly ) {
 
 }
 
-print( '-------------------------------' . PHP_EOL );
-print( 'Загрузка бекапов на целевой сервер' . PHP_EOL );
-print( '-------------------------------' . PHP_EOL );
+if ( ! $backaupOnly ) {
+	print( '-------------------------------' . PHP_EOL );
+	print( 'Загрузка бекапов на целевой сервер' . PHP_EOL );
+	print( '-------------------------------' . PHP_EOL );
 
-$ts3_ServerInstance = TeamSpeak3::factory( "serverquery://$dstLogin:$dstPassword@$dstIp:$dstQueryPort/?#use_offline_as_virtual&blocking=0" );
+	$ts3_ServerInstance = TeamSpeak3::factory( "serverquery://$dstLogin:$dstPassword@$dstIp:$dstQueryPort/?#use_offline_as_virtual&blocking=0" );
 
-foreach ( scandir( $tempDir ) as $dirName ) {
-	if ( is_dir( $tempDir . '/' . $dirName ) && $dirName != '.' && $dirName != '..' ) {
-		print ( 'Виртуальный сервер с портом: ' . $dirName . PHP_EOL );
+	foreach ( scandir( $tempDir ) as $dirName ) {
+		if ( is_dir( $tempDir . '/' . $dirName ) && $dirName != '.' && $dirName != '..' ) {
+			print ( 'Виртуальный сервер с портом: ' . $dirName . PHP_EOL );
 
-		$new_sid = $ts3_ServerInstance->serverCreate( array(
-			"virtualserver_maxclients" => 5,
-			"virtualserver_port"       => (int) $dirName,
-		) );
-		$sid     = (int) $new_sid['sid'];
-		print ( 'Сервер создан' . PHP_EOL );
-		usleep( 100000 );
+			$new_sid = $ts3_ServerInstance->serverCreate( array(
+				"virtualserver_maxclients" => 5,
+				"virtualserver_port"       => (int) $dirName,
+			) );
+			$sid     = (int) $new_sid['sid'];
+			print ( 'Сервер создан' . PHP_EOL );
+			usleep( 100000 );
 
-		$snapshot = file_get_contents( $tempDir . '/' . $dirName . '/snapshot' );
+			$snapshot = file_get_contents( $tempDir . '/' . $dirName . '/snapshot' );
 
-		$ts3_ServerInstance->serverGetById( $sid )->snapshotDeploy($snapshot);
-		$ts3_ServerInstance->serverListReset();
-		$ts3_ServerInstance->whoamiReset();
-		print ( 'Снапшот развернут' . PHP_EOL );
+			$ts3_ServerInstance->serverGetById( $sid )->snapshotDeploy( $snapshot );
+			$ts3_ServerInstance->serverListReset();
+			$ts3_ServerInstance->whoamiReset();
+			print ( 'Снапшот развернут' . PHP_EOL );
 
-		if ( $slowMode === true ) {
-			sleep( 1 );
-		}
+			if ( $slowMode === true ) {
+				sleep( 1 );
+			}
 
-		if ( $iconTransfer ) {
-			$virtualServerFiles = scandir( $tempDir . '/' . $dirName );
-			$ts3_VirtualServer  = $ts3_ServerInstance->serverGetByPort( (int) $dirName );
-			foreach ( $virtualServerFiles as $item ) {
-				if ( strcasecmp( $item, '.' ) === 0 || strcasecmp( $item, '..' ) === 0 || strcasecmp( $item, 'snapshot' ) === 0 ) {
-					continue;
-				}
-				try {
-					$icon     = file_get_contents( $tempDir . '/' . $dirName . '/' . $item );
-					$crc      = crc32( $icon );
-					$size     = strlen( $icon );
-					$upload   = $ts3_VirtualServer->transferInitUpload( rand( 0x0000, 0xFFFF ), 0, "/icon_" . $crc, $size );
-					$transfer = TeamSpeak3::factory( "filetransfer://" . ( strstr( $upload["host"], ":" ) !== false ? "[" . $upload["host"] . "]" : $upload["host"] ) . ":" . $upload["port"] );
-					$transfer->upload( $upload["ftkey"], $upload["seekpos"], $icon );
-					print ( 'Файл: ' . $tempDir . '/' . $dirName . '/' . $item . ' загужен' . PHP_EOL );
-					usleep( 100000 );
-					if ( $slowMode === true ) {
-						sleep( 1 );
+			if ( $iconTransfer ) {
+				$virtualServerFiles = scandir( $tempDir . '/' . $dirName );
+				$ts3_VirtualServer  = $ts3_ServerInstance->serverGetByPort( (int) $dirName );
+				foreach ( $virtualServerFiles as $item ) {
+					if ( strcasecmp( $item, '.' ) === 0 || strcasecmp( $item, '..' ) === 0 || strcasecmp( $item, 'snapshot' ) === 0 ) {
+						continue;
 					}
-				} catch ( \Exception $e ) {
-					print( 'Во время загрузки иконок произошла ошибка: ' . $e->getMessage() . PHP_EOL );
+					try {
+						$icon     = file_get_contents( $tempDir . '/' . $dirName . '/' . $item );
+						$crc      = crc32( $icon );
+						$size     = strlen( $icon );
+						$upload   = $ts3_VirtualServer->transferInitUpload( rand( 0x0000, 0xFFFF ), 0, "/icon_" . $crc, $size );
+						$transfer = TeamSpeak3::factory( "filetransfer://" . ( strstr( $upload["host"], ":" ) !== false ? "[" . $upload["host"] . "]" : $upload["host"] ) . ":" . $upload["port"] );
+						$transfer->upload( $upload["ftkey"], $upload["seekpos"], $icon );
+						print ( 'Файл: ' . $tempDir . '/' . $dirName . '/' . $item . ' загужен' . PHP_EOL );
+						usleep( 100000 );
+						if ( $slowMode === true ) {
+							sleep( 1 );
+						}
+					} catch ( \Exception $e ) {
+						print( 'Во время загрузки иконок произошла ошибка: ' . $e->getMessage() . PHP_EOL );
+					}
+
 				}
 
 			}
-
 		}
 	}
 }
